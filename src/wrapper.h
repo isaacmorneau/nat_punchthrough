@@ -3,6 +3,7 @@
 
 #include <stdlib.h>
 #include <netdb.h>
+#include <sys/epoll.h>
 
 //==>assert macros<==
 #ifdef NDEBUG
@@ -32,19 +33,35 @@
 void set_fd_limit();
 void set_non_blocking(int sfd);
 
+//==>ip wrappers<==
+int fill_storage(struct sockaddr_storage * addr, const char * host, int port);
+
 //==>tcp wrappers<==
-int make_bound(const char * port);
+int make_bound_tcp(const char * port);
 int make_connected(const char * address, const char * port);
 
 //==>udp wrappers<==
-int make_udp(int port);
+void make_storage(struct sockaddr_storage * addr, const char * host, int port);
+int make_bound_udp(int port);
 int read_message(int sockfd, char * buffer, int len);
-int send_message(int sockfd, const char * buffer, int len, const struct sockaddr * addr, socklen_t addr_len);
+int send_message(int sockfd, const char * buffer, int len, const struct sockaddr_storage * addr);
 
 
 //==>epoll wrappers<==
 #define MAXEVENTS 256
+//simplicity wrappers
+#define EVENT_IN(events, i) (events[i].events & EPOLLIN)
+#define EVENT_ERR(events, i) (events[i].events & EPOLLERR)
+#define EVENT_HUP(events, i) (events[i].events & EPOLLHUP)
+#define EVENT_OUT(events, i) (events[i].events & EPOLLIN)
+
+#define EVENT_FD(events, i) (events[i].data.fd)
+#define EVENT_PTR(events, i) (events[i].data.ptr)
+
 int make_epoll();
+inline struct epoll_event * make_epoll_events() {
+    return (struct epoll_event *)malloc(sizeof(struct epoll_event)*MAXEVENTS);
+}
 int wait_epoll(int efd, struct epoll_event * events);
 int add_epoll_ptr(int efd, int ifd, void * ptr);
 int add_epoll_fd(int efd, int ifd);

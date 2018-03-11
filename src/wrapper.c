@@ -53,7 +53,7 @@ int make_connected(const char * address, const char * port) {
     ensure(getaddrinfo(address, port, &hints, &result) == 0);
 
     for (rp = result; rp != 0; rp = rp->ai_next) {
-        if ((sfd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol)) == -1) {
+        if ((sfd = socket(rp->ai_family, rp->ai_socktype|SOCK_NONBLOCK|SOCK_CLOEXEC, rp->ai_protocol)) == -1) {
             continue;
         }
 
@@ -71,7 +71,7 @@ int make_connected(const char * address, const char * port) {
     return sfd;
 }
 
-int make_bound(const char * port) {
+int make_bound_tcp(const char * port) {
     struct addrinfo hints;
     struct addrinfo *result, *rp;
     int sfd = -1;
@@ -81,10 +81,11 @@ int make_bound(const char * port) {
     hints.ai_socktype = SOCK_STREAM; // We want a TCP socket
     hints.ai_flags = AI_PASSIVE;     // All interfaces
 
-    ensure(getaddrinfo(0, port, &hints, &result) == 0);
+    //NULL host will bind to local
+    ensure(getaddrinfo(NULL, port, &hints, &result) == 0);
 
-    for (rp = result; rp != 0; rp = rp->ai_next) {
-        if ((sfd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol)) == -1) {
+    for (rp = result; rp != NULL; rp = rp->ai_next) {
+        if ((sfd = socket(rp->ai_family, rp->ai_socktype|SOCK_NONBLOCK|SOCK_CLOEXEC, rp->ai_protocol)) == -1) {
             continue;
         }
 
@@ -99,7 +100,7 @@ int make_bound(const char * port) {
         close(sfd);
     }
 
-    ensure(rp != 0);
+    ensure(rp);
 
     freeaddrinfo(result);
 
@@ -107,40 +108,71 @@ int make_bound(const char * port) {
 }
 
 //==>udp wrappers<==
-int make_udp(int port) {
+void make_storage(struct sockaddr_storage * restrict addr, const char * restrict host, int port) {
+    struct addrinfo hints;
+    struct addrinfo * rp;
+
+    memset(&hints, 0, sizeof (struct addrinfo));
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_DGRAM;
+    hints.ai_flags = AI_PASSIVE;// All interfaces
+
+    //null the service as it only accepts strings and we have the port already
+    ensure(getaddrinfo(host, NULL, &hints, &rp) == 0);
+
+    //assuming the first result returned will be correct
+    //TODO find a way to check
+    ensure(rp);
+
+    //add the port manually
+    if (rp->ai_family == AF_INET) {
+        ((struct sockaddr_in *)rp->ai_addr)->sin_port = htons(port);
+    } else if (rp->ai_family == AF_INET6) {
+        ((struct sockaddr_in6 *)rp->ai_addr)->sin6_port = htons(port);
+    }
+
+    memcpy(addr, rp->ai_addr, rp->ai_addrlen);
+
+    freeaddrinfo(rp);
+}
+
+int make_bound_udp(int port) {
     struct sockaddr_in sin;
     int sockfd;
 
     ensure((sockfd = socket(AF_INET, SOCK_DGRAM|SOCK_NONBLOCK|SOCK_CLOEXEC, 0)) == -1);
 
-    memset(&sin, 0, sizeof sin);
+    memset(&sin, 0, sizeof(sin));
     sin.sin_addr.s_addr = htonl(INADDR_ANY);
     sin.sin_port = htons(port);
     sin.sin_family = AF_INET;
 
-    ensure(bind(sockfd, (struct sockaddr *) &sin, sizeof sin) == -1);
+    ensure(bind(sockfd, (struct sockaddr *) &sin, sizeof(sin)) == -1);
 
     return sockfd;
 }
 
 int read_message(int sockfd, char * restrict buffer, int len) {
-    struct sockaddr addr;
+    struct sockaddr_storage addr;
     socklen_t addr_len;
     char hbuf[NI_MAXHOST], sbuf[NI_MAXSERV];
     int total = 0, ret;
 readmsg:
-    ensure_nonblock((ret = recvfrom(sockfd, buffer, len, 0, &addr, &addr_len)) != -1);
+    addr_len = sizeof(struct sockaddr_storage);
+    ensure_nonblock((ret = recvfrom(sockfd, buffer, len, 0, (struct sockaddr *)&addr,
+                    &addr_len)) != -1);
     if (ret == -1)
         return total;
     total += ret;
-    ensure(getnameinfo(&addr, addr_len, hbuf, sizeof(hbuf), sbuf, sizeof(hbuf), NI_NUMERICHOST|NI_NUMERICSERV|NI_DGRAM) == 0);
+    ensure(getnameinfo((struct sockaddr *)&addr, addr_len, hbuf, sizeof(hbuf), sbuf, sizeof(hbuf), NI_NUMERICHOST|NI_NUMERICSERV|NI_DGRAM) == 0);
     printf("read %d from %s:%s\n", ret, hbuf, sbuf);
     goto readmsg;
 }
 
-int send_message(int sockfd, const char * restrict buffer, int len, const struct sockaddr * addr, socklen_t addr_len) {
+int send_message(int sockfd, const char * restrict buffer, int len, const struct sockaddr_storage * restrict addr) {
     int ret;
-    ensure_nonblock((ret = sendto(sockfd, buffer, len, 0, addr, addr_len)) != -1);
+    socklen_t addr_len = sizeof(struct sockaddr_storage);
+    ensure_nonblock((ret = sendto(sockfd, buffer, len, 0, (struct sockaddr *)addr, addr_len)) != -1);
     return ret;
 }
 
