@@ -10,12 +10,11 @@
 
 #define BUFF 512
 
-typedef struct {
-    int out_port;
-    int in_port;
-} punch_packet;
+const char * mesg = "hello";
+const char * mesg2 = "connected";
 
 void start_punch(const char * host, const int port, const int range) {
+    char buffer[BUFF];
     int efd = make_epoll();
     struct epoll_event * events = make_epoll_events();
 
@@ -32,48 +31,44 @@ void start_punch(const char * host, const int port, const int range) {
         add_epoll_fd_flags(efd, sockets[i], EVENT_ONLY_IN);
     }
 
-    punch_packet inpack = {0}, outpack = {0};
+    int stable_port = 0;
 
 try:
     for (int j = 0; j < range; ++j) {
         for (int i = 0; i < j; ++i) {
-            outpack.out_port = htonl(port + i);
-            send_message(sockets[i], (char *)&outpack, sizeof(punch_packet), addresses + i);
+            send_message(sockets[i], (char *)mesg, strlen(mesg), addresses + i);
         }
         n = wait_epoll_timeout(efd, events, 1000);
         for (int i = 0; i < n; ++i) {
             if (EVENT_IN(events, i)) {
-                read_message(EVENT_FD(events, i), (char *)&inpack, sizeof(punch_packet));
-                printf("recived op %d ip %d\n", ntohl(inpack.out_port), ntohl(inpack.in_port));
-                if (inpack.out_port) {
-                    outpack.in_port = inpack.out_port;
-                }
-                if (inpack.in_port) {
-                    int offset = ntohl(inpack.in_port) - port;
+                read_message_port(EVENT_FD(events, i), buffer, BUFF, &stable_port);
+                int offset = stable_port - port;
 
-                    s = sockets[offset];
-                    memcpy(&stable_addr, addresses + offset, sizeof(struct sockaddr_storage));
+                s = sockets[offset];
+                memcpy(&stable_addr, addresses + offset, sizeof(struct sockaddr_storage));
 
-                    for (int k = 0; k < range; ++k)
-                        if (k != offset)
-                            close(sockets[k]);
+                for (int k = 0; k < range; ++k)
+                    if (k != offset)
+                        close(sockets[k]);
 
-                    free(addresses);
-                    free(sockets);
-                    goto maintain;
-                }
+                free(addresses);
+                free(sockets);
+                goto maintain;
             }
         }
     }
     goto try;
 maintain:
-    send_message(s, (char*)&outpack, sizeof(punch_packet), &stable_addr);
+    send_message(s, (char*)mesg2, strlen(mesg2), &stable_addr);
     n = wait_epoll_timeout(efd, events, 1000);
     for (int i = 0; i < n; ++i) {
         if (EVENT_IN(events, i)) {
-            read_message(EVENT_FD(events, i), (char *)&inpack, sizeof(punch_packet));
-            printf("connection betweeen op %d ip %d steady\n", ntohl(inpack.out_port), ntohl(inpack.in_port));
+            read_message(EVENT_FD(events, i), buffer, BUFF);
+            puts("connection steady");
         }
+    }
+    if (!n) {
+        puts("connection timing out");
     }
     goto maintain;
 }
