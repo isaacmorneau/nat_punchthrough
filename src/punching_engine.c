@@ -9,8 +9,8 @@
 #define BUFF 512
 
 typedef struct {
-    int16_t out_port;
-    int16_t in_port;
+    int out_port;
+    int in_port;
 } punch_packet;
 
 void start_punch(const char * host, const int port, const int range) {
@@ -37,16 +37,17 @@ try:
         outpack.in_port = inpack.out_port;
     }
     for (int i = 0; i < range; ++i) {
-        outpack.out_port = port + i;
+        outpack.out_port = htonl(port + i);
         send_message(sockets[i], (char *)&outpack, sizeof(punch_packet), addresses + i);
     }
     n = wait_epoll_timeout(efd, events, 1000);
     for (int i = 0; i < n; ++i) {
         if (EVENT_IN(events, i)) {
             read_message(EVENT_FD(events, i), (char *)&inpack, sizeof(punch_packet));
-            printf("recived op %d ip %d\n", inpack.out_port, inpack.in_port);
+            printf("recived op %d ip %d\n", ntohl(inpack.out_port), ntohl(inpack.in_port));
             if (inpack.in_port) {
-                offset = inpack.in_port - port;
+                offset = ntohl(inpack.in_port) - port;
+                printf("%d-%d=offset%d\n", ntohl(inpack.in_port), port, offset);
                 goto maintain;
             }
         }
@@ -59,9 +60,6 @@ maintain:
         if (EVENT_IN(events, i)) {
             read_message(EVENT_FD(events, i), (char *)&inpack, sizeof(punch_packet));
             printf("connection betweeen op %d ip %d steady\n", inpack.out_port, inpack.in_port);
-            if (inpack.in_port) {
-                goto maintain;
-            }
         }
     }
     goto maintain;
