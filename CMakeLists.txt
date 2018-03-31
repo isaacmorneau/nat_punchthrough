@@ -24,8 +24,9 @@ add_definitions(-D_DEFAULT_SOURCE)
 include_directories(src)
 file(GLOB MAIN
     "src/*.c"
-    "src/*.cpp"
     "src/*.h"
+    "src/wrappers/*.c"
+    "src/wrappers/*.h"
     )
 
 add_executable(natpunch ${MAIN})

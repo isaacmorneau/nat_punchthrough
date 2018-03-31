@@ -1,18 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <getopt.h>
 #include <errno.h>
-
-#include <netdb.h>
-#include <sys/epoll.h>
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-
-#include<netinet/tcp.h>
-#include<netinet/ip.h>
+#include "punching_engine.h"
 
 #define SOCKOPTS "p:r:a:h"
 #define PORT 44000
@@ -62,10 +52,11 @@ int main(int argc, char ** argv) {
                 return 0;
         }
     }
-    if (!port || !addr) {
+    if (!port || !addr || !range) {
         print_help();
         return 1;
     }
 
+    start_punch(addr, port, range);
     return 0;
 }
