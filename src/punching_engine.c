@@ -32,10 +32,6 @@ void start_punch(const char * host, const int port, const int range) {
     punch_packet inpack = {0}, outpack = {0};
 
 try:
-    if (inpack.out_port) {
-        //we got a message telling us what worked
-        outpack.in_port = inpack.out_port;
-    }
     for (int i = 0; i < range; ++i) {
         outpack.out_port = htonl(port + i);
         send_message(sockets[i], (char *)&outpack, sizeof(punch_packet), addresses + i);
@@ -45,6 +41,9 @@ try:
         if (EVENT_IN(events, i)) {
             read_message(EVENT_FD(events, i), (char *)&inpack, sizeof(punch_packet));
             printf("recived op %d ip %d\n", ntohl(inpack.out_port), ntohl(inpack.in_port));
+            if (inpack.out_port) {
+                outpack.in_port = inpack.out_port;
+            }
             if (inpack.in_port) {
                 offset = ntohl(inpack.in_port) - port;
                 printf("%d-%d=offset%d\n", ntohl(inpack.in_port), port, offset);
@@ -59,7 +58,7 @@ maintain:
     for (int i = 0; i < n; ++i) {
         if (EVENT_IN(events, i)) {
             read_message(EVENT_FD(events, i), (char *)&inpack, sizeof(punch_packet));
-            printf("connection betweeen op %d ip %d steady\n", inpack.out_port, inpack.in_port);
+            printf("connection betweeen op %d ip %d steady\n", ntohl(inpack.out_port), ntohl(inpack.in_port));
         }
     }
     goto maintain;
