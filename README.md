@@ -8,10 +8,11 @@ enter the following to clone the repo and its submodule then build the project
 
 ```
 git clone --recurse-submodules https://github.com/isaacmorneau/nat_punchthrough.git
-cd nat_punchthrough
-cmake ./
+mkdir nat_punchthrough/bin
+cd nat_punchthrough/bin
+cmake ..
 make
-./bin/natpunch
+./natpunch
 ```
 
 ## usage
