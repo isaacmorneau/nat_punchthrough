@@ -19,7 +19,7 @@ void start_punch(const char * host, const int port, const int range) {
     for (int i = 0; i < range; ++i) {
         make_storage(addresses + i, host, port + i);
         sockets[i] = make_bound_udp(port + i);
-        add_epoll_fd(efd, sockets[i]);
+        add_epoll_fd_flags(efd, sockets[i], EVENT_ONLY_IN);
     }
 try:
     strncpy(buffer, "message", BUFF);
