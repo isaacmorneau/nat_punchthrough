@@ -10,9 +10,6 @@
 
 #define BUFF 512
 
-const char * mesg = "hello";
-const char * mesg2 = "connected";
-
 void start_punch(const char * host, const int port, const int range) {
     char buffer[BUFF];
     int efd = make_epoll();
@@ -21,6 +18,7 @@ void start_punch(const char * host, const int port, const int range) {
     struct sockaddr_storage * addresses = (struct sockaddr_storage*)calloc(range, sizeof(struct sockaddr_storage));
     struct sockaddr_storage stable_addr;
     int n = 0, s = 0;
+    int stable_port = 0;
     int * sockets = calloc(range, sizeof(int));
 
 
@@ -31,12 +29,11 @@ void start_punch(const char * host, const int port, const int range) {
         add_epoll_fd_flags(efd, sockets[i], EVENT_ONLY_IN);
     }
 
-    int stable_port = 0;
 
 try:
     for (int j = 0; j < range; ++j) {
         for (int i = 0; i < j; ++i) {
-            send_message(sockets[i], (char *)mesg, strlen(mesg), addresses + i);
+            send_message(sockets[i], 0, 0, addresses + i);
         }
         n = wait_epoll_timeout(efd, events, 1000);
         for (int i = 0; i < n; ++i) {
@@ -59,7 +56,7 @@ try:
     }
     goto try;
 maintain:
-    send_message(s, (char*)mesg2, strlen(mesg2), &stable_addr);
+    send_message(s, 0, 0, &stable_addr);
     n = wait_epoll_timeout(efd, events, 1000);
     for (int i = 0; i < n; ++i) {
         if (EVENT_IN(events, i)) {

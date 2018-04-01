@@ -15,7 +15,7 @@ set(CMAKE_C_FLAGS "-Wall -Wextra -std=c11 -pedantic")
 set(CMAKE_C_FLAGS_DEBUG "-ggdb -O0")
 set(CMAKE_C_FLAGS_RELEASE "-O3 -march=native -flto")
 
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+#set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 
 add_definitions(-D_POSIX_C_SOURCE=200809L)
